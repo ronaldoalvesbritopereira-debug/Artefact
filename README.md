@@ -1,60 +1,59 @@
-# Assistente de atendimento — Empório da Música
+# Customer Support Assistant — Empório da Música
 
-Aplicação de atendimento em português que combina as políticas da loja, o catálogo e
-os dados operacionais para responder perguntas sobre instrumentos, pedidos e regras
-de atendimento. O sistema usa um modelo local via Ollama e apresenta uma interface
-conversacional em Streamlit.
+A Portuguese-language customer support application that combines store policies,
+catalog data, and operational information to answer questions about instruments,
+orders, and customer service policies. The system uses a local model through Ollama
+and provides a conversational interface with Streamlit.
 
-O agente identifica se deve consultar as políticas, os dados da loja ou ambos,
-mantém o contexto de perguntas de acompanhamento durante a sessão e informa as fontes
-utilizadas. Perguntas fora do escopo do atendimento recebem uma resposta apropriada,
-sem recuperar documentos nem consultar o banco de dados.
+The agent determines whether to consult store policies, operational data, or both. It
+maintains context for follow-up questions during a session and identifies the sources
+used. Out-of-scope questions receive an appropriate response without retrieving
+documents or querying the database.
 
-## Arquitetura
+## Architecture
 
-1. **Dados estruturados:** os CSVs em `Desafio Técnico AI Engineer 2026/data` são
-   carregados automaticamente em SQLite. O Pandas infere os tipos das colunas; um
-   fingerprint detecta alterações nos arquivos e evita recriar o banco sem necessidade.
-2. **Documentos:** `PyPDFLoader` extrai as páginas dos PDFs. O
-   `RecursiveCharacterTextSplitter` preserva os metadados de origem e página ao
-   particionar o conteúdo.
-3. **Recuperação:** BM25 e BGE-M3 recuperam documentos em paralelo. O
-   `EnsembleRetriever` combina as posições usando Reciprocal Rank Fusion, e
-   `CrossEncoderReranker` com BGE-Reranker-v2-M3 seleciona o trecho mais relevante
-   (`k = 1`) para o contexto final. O índice semântico é persistido localmente.
-4. **Roteamento:** uma chamada estruturada à LLM classifica a pergunta como RAG, SQL
-   ou HYBRID e reescreve referências de perguntas de acompanhamento. Assuntos fora
-   do escopo recebem uma resposta curta sem consulta às fontes.
-5. **Consultas SQL:** `SQLDatabase` disponibiliza o esquema à LLM e executa a consulta
-   gerada. A validação aceita somente uma instrução iniciada por `SELECT` ou `WITH`;
-   a conexão SQLite também é aberta em modo somente leitura.
-6. **Histórico e resposta:** um fluxo determinístico de um nó com `InMemorySaver`
-   mantém o histórico em memória durante a sessão. A resposta recebe somente o trecho
-   recuperado e/ou o resultado SQL, e deve informar quando as fontes não contêm os
-   dados necessários.
-7. **Interface:** Streamlit mostra a origem da resposta, as páginas consultadas e,
-   para perguntas SQL, a consulta gerada.
+1. **Structured data:** CSV files in `Desafio Técnico AI Engineer 2026/data` are
+   automatically loaded into SQLite. Pandas infers column types, and a fingerprint
+   detects file changes to avoid rebuilding the database unnecessarily.
+2. **Documents:** `PyPDFLoader` extracts PDF pages. `RecursiveCharacterTextSplitter`
+   splits the content while preserving source and page metadata.
+3. **Retrieval:** BM25 and BGE-M3 retrieve documents in parallel. `EnsembleRetriever`
+   combines their rankings using Reciprocal Rank Fusion, and `CrossEncoderReranker`
+   with BGE-Reranker-v2-M3 selects the most relevant passage (`k = 1`) for the final
+   context. The semantic index is persisted locally.
+4. **Routing:** a structured LLM call classifies each question as RAG, SQL, or HYBRID,
+   and rewrites references in follow-up questions. Out-of-scope topics receive a
+   short response without querying the data sources.
+5. **SQL queries:** `SQLDatabase` provides the schema to the LLM and executes the
+   generated query. Validation accepts only a single statement starting with `SELECT`
+   or `WITH`; the SQLite connection is also opened in read-only mode.
+6. **History and response:** a deterministic, single-node workflow with `InMemorySaver`
+   keeps conversation history in memory for the duration of the session. The response
+   receives only the retrieved passage and/or SQL result, and should state when the
+   sources do not contain the necessary information.
+7. **Interface:** Streamlit displays the response source, the pages consulted, and the
+   generated query for SQL questions.
 
-O roteamento usa uma cadeia determinística em vez de um agente autônomo. O Ollama
-executa `qwen3:8b`; os embeddings e o reranker usam os modelos BGE definidos na
-configuração. Os vetores BGE-M3 incluídos em `artifacts/` são reaproveitados somente
-quando o hash do PDF, as páginas, o modelo e as dimensões conferem. O
-`InMemoryVectorStore` do LangChain mantém o índice vetorial, serializado em JSON.
-O índice e o banco SQLite ficam em `.artifacts/` e não precisam ser versionados.
+Routing uses a deterministic chain rather than an autonomous agent. Ollama runs
+`qwen3:8b`; embeddings and reranking use the BGE models specified in the configuration.
+The BGE-M3 vectors included in `artifacts/` are reused only when the PDF hash, pages,
+model, and dimensions match. LangChain's `InMemoryVectorStore` manages the vector
+index, which is serialized as JSON. The index and SQLite database are stored in
+`.artifacts/` and do not need to be committed to version control.
 
-## Tecnologias
+## Technologies
 
 - Python 3.10+
-- LangChain e LangGraph: `ChatOllama`, saída estruturada, loaders, splitters,
-  retrievers, compressão/reranking, SQLDatabase e histórico de mensagens
+- LangChain and LangGraph: `ChatOllama`, structured output, loaders, splitters,
+  retrievers, compression/reranking, SQLDatabase, and message history
 - Ollama: `qwen3:8b`
-- BGE-M3 e BGE-Reranker-v2-M3
-- SQLite, SQLAlchemy e Pandas
-- InMemoryVectorStore e Streamlit
+- BGE-M3 and BGE-Reranker-v2-M3
+- SQLite, SQLAlchemy, and Pandas
+- InMemoryVectorStore and Streamlit
 
-## Instalação
+## Installation
 
-No PowerShell, na raiz do repositório:
+In PowerShell, from the repository root:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -63,178 +62,176 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt -e ".[test]"
 ```
 
-Se a política de execução do PowerShell impedir a ativação do ambiente, use o
-executável diretamente:
+If the PowerShell execution policy prevents activating the virtual environment, use
+the interpreter directly:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt -e ".[test]"
 ```
 
-## Configuração do Ollama
+## Ollama setup
 
-Instale e inicie o Ollama. Baixe o modelo principal uma vez:
+Install and start Ollama. Pull the main model once:
 
 ```powershell
 ollama pull qwen3:8b
 ```
 
-O serviço deve estar acessível em `http://127.0.0.1:11434`. Na primeira execução,
-os modelos BGE são carregados pelo Hugging Face; é necessária conexão à internet
-para baixar os pesos caso ainda não estejam no cache local. O arquivo
-`.env.example` lista as variáveis opcionais para ajustar o endereço do Ollama,
-os diretórios e os identificadores dos modelos. O Ollama decide automaticamente
-como distribuir o Qwen entre GPU e CPU; os modelos BGE usam CPU.
-O Qwen permanece carregado durante chamadas consecutivas de classificação e resposta;
-antes da recuperação BGE, o pipeline o descarrega para reduzir o uso simultâneo de
-memória.
+The service must be accessible at `http://127.0.0.1:11434`. On the first run, the BGE
+models are loaded from Hugging Face; an internet connection is required to download
+the model weights if they are not already cached locally. `.env.example` lists
+optional variables for configuring the Ollama URL, directories, and model identifiers.
+Ollama automatically decides how to distribute Qwen across the GPU and CPU; the BGE
+models use the CPU. Qwen remains loaded during consecutive classification and response
+calls; before BGE retrieval, the pipeline unloads it to reduce simultaneous memory
+usage.
 
-## Execução
+## Run
 
-Com o ambiente virtual ativado:
+With the virtual environment activated:
 
 ```powershell
 streamlit run app.py
 ```
 
-O Streamlit exibirá o endereço local da interface. Na primeira inicialização, o
-projeto cria o SQLite e o índice semântico local, se necessário. Os arquivos-fonte
-permanecem inalterados.
+Streamlit will display the local interface URL. On first startup, the project creates
+the SQLite database and local semantic index if needed. Source files remain unchanged.
 
-Para validar a instalação:
+To validate the installation:
 
 ```powershell
 pytest
 ```
 
-Os testes cobrem o roteamento, os fluxos SQL e HYBRID, a manutenção do histórico,
-a importação dos CSVs, a validação de consultas somente de leitura e os metadados dos
-documentos. A suíte foi executada neste ambiente com **26 testes aprovados**.
+The tests cover routing, SQL and HYBRID flows, conversation history, CSV imports,
+read-only query validation, and document metadata. The test suite was run in this
+environment with **26 tests passing**.
 
-## Exemplos de perguntas
+## Sample questions
 
-- **RAG:** “Qual é o prazo para arrependimento de uma compra online?”
-- **SQL:** “Quais produtos estão cadastrados e qual é o estoque de cada um?”
-- **HYBRID:** “Posso trocar o produto do meu pedido e há unidades disponíveis?”
+The application currently handles questions in Brazilian Portuguese. Examples:
 
-## Decisões técnicas
+- **RAG:** “What is the return period for an online purchase?” (*Qual é o prazo para arrependimento de uma compra online?*)
+- **SQL:** “Which products are listed, and what is each item's stock?” (*Quais produtos estão cadastrados e qual é o estoque de cada um?*)
+- **HYBRID:** “Can I exchange the item in my order, and are replacements in stock?” (*Posso trocar o produto do meu pedido e há unidades disponíveis?*)
 
-Antes do desenvolvimento, pesquisei abordagens recentes para arquiteturas RAG. A
-funcionalidade “Pesquisa Aprofundada” do ChatGPT foi usada como ponto de partida para
-localizar artigos científicos; depois, li os trabalhos selecionados e usei essa
-pesquisa para orientar o planejamento. A experiência anterior com RAG durante a
-pós-graduação também influenciou as decisões e ajudou a avaliar alternativas de
-recuperação.
+## Technical decisions
 
-Escolhi RAG porque parte importante das perguntas do desafio depende de informações
-descritas nas políticas da loja, e não apenas de dados tabulares. Recuperar os trechos
-relacionados à pergunta permite responder com base no documento fornecido, sem enviar
-todo o PDF ao modelo a cada interação. Já preços, estoque e demais informações
-operacionais são consultados nos CSVs por SQL. Assim, cada tipo de pergunta usa a fonte
-mais apropriada; perguntas que combinam regras e dados podem seguir o fluxo HYBRID.
+Before development, I researched recent approaches to RAG architectures. ChatGPT's
+“Deep Research” feature was used as a starting point for finding scientific papers;
+I then read the selected papers and used that research to guide the design. My
+previous experience with RAG during graduate school also influenced the decisions
+and helped me evaluate retrieval alternatives.
 
-Como o prazo de desenvolvimento era de apenas dois dias, priorizei uma arquitetura
-que pudesse ser implementada e testada nesse período, sem fine-tuning de modelos.
-Para a busca nos documentos, considerei alternativas como MPNet e ColBERT. MPNet
-costuma se beneficiar de fine-tuning para esse tipo de tarefa, o que não cabia no
-prazo; ColBERT oferece uma abordagem interessante, mas acrescentaria complexidade de
-instalação e configuração. Optei por combinar BM25 e BGE-M3: a busca lexical ajuda a
-encontrar termos e nomes específicos, enquanto a busca semântica considera o sentido
-da pergunta. A fusão dos resultados com Reciprocal Rank Fusion (RRF) reúne essas duas
-perspectivas, e o BGE-Reranker-v2-M3 reordena os candidatos para selecionar o trecho
-mais relevante.
+I chose RAG because many questions in the challenge depend on information described in
+the store policies, rather than only on tabular data. Retrieving passages related to
+the question makes it possible to answer based on the provided document without
+sending the entire PDF to the model for every interaction. Prices, stock, and other
+operational information are queried from the CSVs using SQL. This lets each question
+use the most appropriate source, while questions that combine policies and data can
+follow the HYBRID flow.
 
-O PDF é dividido em páginas e, em seguida, em trechos menores, preservando metadados
-de origem e página. Embora o desafio forneça um único documento, essa organização
-também deixa a recuperação preparada para receber outros PDFs. Após o reranking,
-utilizo apenas um trecho (`k = 1`) como contexto final. Nos testes, fornecer vários
-trechos ao modelo local aumentava as alucinações e, por vezes, dificultava a geração
-de uma resposta adequada. Com um modelo de maior capacidade e uma janela de contexto
-maior, seria possível reavaliar essa escolha e incluir páginas vizinhas quando fossem
-necessárias para preservar o contexto.
+Since the development period was only two days, I prioritized an architecture that
+could be implemented and tested within that timeframe, without fine-tuning models.
+For document retrieval, I considered alternatives such as MPNet and ColBERT. MPNet
+typically benefits from fine-tuning for this type of task, which did not fit the
+schedule; ColBERT is an interesting approach but would add installation and
+configuration complexity. I chose to combine BM25 and BGE-M3: lexical search helps
+find specific terms and names, while semantic search considers the meaning of the
+question. Reciprocal Rank Fusion (RRF) combines these two perspectives, and
+BGE-Reranker-v2-M3 reranks the candidates to select the most relevant passage.
 
-Os prompts foram ajustados iterativamente durante os testes, buscando instruções
-claras sem consumir contexto desnecessariamente. Para definir a persona e o tom da
-resposta, usei como referência o manual de políticas da loja, de modo que o
-atendimento permanecesse coerente com as informações fornecidas no desafio.
+The PDF is split into pages and then into smaller passages, preserving source and
+page metadata. Although the challenge provides a single document, this organization
+also prepares retrieval for additional PDFs. After reranking, I use only one passage
+(`k = 1`) as the final context. During testing, providing multiple passages to the
+local model increased hallucinations and sometimes made it harder to generate an
+appropriate response. With a more capable model and a larger context window, this
+choice could be revisited, and neighboring pages could be included when needed to
+preserve context.
 
-O roteamento foi implementado como uma cadeia determinística, e não como um agente
-autônomo. Uma chamada estruturada classifica a pergunta como RAG, SQL ou HYBRID antes
-da execução. Essa separação deixa explícito qual fonte deve ser consultada e facilita
-inspecionar o caminho seguido pela aplicação. Perguntas fora do escopo da loja são
-tratadas sem consultar documentos ou banco de dados.
+Prompts were iteratively refined during testing to provide clear instructions without
+unnecessarily consuming context. The store policy manual served as a reference for
+defining the response persona and tone, keeping the customer support experience
+consistent with the information provided in the challenge.
 
-Para o modelo de linguagem, escolhi o `qwen3:8b` executado localmente pelo Ollama. A
-opção evita custos com APIs durante a execução e é suficiente para o protótipo, embora
-tenha limitações de capacidade e de recursos disponíveis na máquina. O modelo é
-utilizado tanto na classificação quanto na geração das respostas. Os prompts foram
-mantidos objetivos para equilibrar as instruções de atendimento, o contexto recuperado
-e a janela disponível. A resposta também deve respeitar a persona da loja e sinalizar
-quando as fontes não contiverem os dados necessários.
+Routing was implemented as a deterministic chain rather than an autonomous agent. A
+structured call classifies each question as RAG, SQL, or HYBRID before execution.
+This makes the data source selection explicit and makes it easier to inspect the path
+taken by the application. Questions outside the store's scope are handled without
+querying documents or the database.
 
-Para os dados tabulares, escolhi SQLite por ser simples de distribuir e não exigir um
-servidor separado. Os CSVs são carregados automaticamente, e o Pandas infere os tipos
-das colunas para favorecer consultas sobre valores numéricos, como preços e estoque.
-As consultas geradas são limitadas a uma única instrução `SELECT` ou `WITH`, e a
-conexão é aberta em modo somente leitura.
+I chose `qwen3:8b`, running locally through Ollama, as the language model. This avoids
+API costs during execution and is sufficient for the prototype, although it is limited
+by the model's capabilities and the resources available on the machine. The model is
+used for both classification and response generation. Prompts are kept concise to
+balance the customer-service instructions, retrieved context, and available context
+window. Responses should also follow the store persona and state when the sources do
+not contain the necessary information.
 
-Na migração para a estrutura atual, LangChain passou a fornecer integrações para
-modelos, documentos, recuperação e SQL, enquanto LangGraph organiza o fluxo e o
-histórico da conversa. O Streamlit foi escolhido para oferecer uma interface simples
-de demonstração sem tirar o foco do funcionamento do agente. O histórico é mantido em
-memória durante a sessão, evitando adicionar infraestrutura de persistência que não
-era essencial para o escopo do desafio.
+For tabular data, I chose SQLite because it is easy to distribute and does not require
+a separate database server. CSVs are loaded automatically, and Pandas infers column
+types to support queries involving numeric values such as prices and stock. Generated
+queries are limited to a single `SELECT` or `WITH` statement, and the connection is
+opened in read-only mode.
 
-## Exemplos de interação
+In the current project structure, LangChain provides integrations for models,
+documents, retrieval, and SQL, while LangGraph organizes the workflow and conversation
+history. Streamlit provides a simple demonstration interface without distracting
+from the agent's functionality. Conversation history is kept in memory for the
+duration of a session, avoiding persistence infrastructure that was not essential to
+the challenge scope.
 
-As imagens abaixo registram cinco cenários variados de uso do agente:
+## Sample interactions
 
-**Aplicação de uma política de devolução (RAG):**
+The images below show five different use cases:
 
-![Resposta sobre a política de devolução, com indicação da origem da resposta](resultados_imagens/pergunta4.png)
+**Applying a return policy (RAG):**
 
-1. **Consulta de catálogo com filtro de preço (SQL):** [parte 1](resultados_imagens/pergunta1_parte1.png) e [parte 2](resultados_imagens/pergunta1_parte2.png).
-2. **Informação sobre o endereço da loja (RAG):** [ver imagem](resultados_imagens/pergunta2.png).
-3. **Consulta de preço de produto (SQL):** [ver imagem](resultados_imagens/pergunta3.png).
-4. **Aplicação da política de devolução (RAG):** [ver imagem](resultados_imagens/pergunta4.png).
-5. **Consulta de instrumentos de percussão (SQL):** [ver imagem](resultados_imagens/pergunta5.png).
+![Response about the return policy, showing the response source](resultados_imagens/pergunta4.png)
 
-## Estrutura
+1. **Catalog query with a price filter (SQL):** [part 1](resultados_imagens/pergunta1_parte1.png) and [part 2](resultados_imagens/pergunta1_parte2.png).
+2. **Store address information (RAG):** [view image](resultados_imagens/pergunta2.png).
+3. **Product price lookup (SQL):** [view image](resultados_imagens/pergunta3.png).
+4. **Return policy question (RAG):** [view image](resultados_imagens/pergunta4.png).
+5. **Percussion instrument catalog query (SQL):** [view image](resultados_imagens/pergunta5.png).
+
+## Project structure
 
 ```text
 app.py
 src/artefact_rag/
-  database.py       # Importação CSV, SQLite e consultas somente leitura
-  documents.py      # Loader de PDFs e divisão em documentos
-  pipeline.py       # Roteamento e execução dos fluxos
-  retrieval.py      # BM25, BGE-M3, RRF, reranking e persistência
-  routing.py        # Classificação estruturada
-  settings.py       # Configurações centralizadas
-  sql_generation.py # Esquema de saída da consulta SQL
-artifacts/          # Embeddings de páginas e metadados de compatibilidade
-Desafio Técnico AI Engineer 2026/data/     # PDFs e CSVs fornecidos
+  database.py       # CSV import, SQLite, and read-only queries
+  documents.py      # PDF loading and document splitting
+  pipeline.py       # Routing and flow execution
+  retrieval.py      # BM25, BGE-M3, RRF, reranking, and persistence
+  routing.py        # Structured classification
+  settings.py       # Centralized configuration
+  sql_generation.py # SQL query output schema
+artifacts/          # Page embeddings and compatibility metadata
+Desafio Técnico AI Engineer 2026/data/     # Provided PDFs and CSVs
 tests/
 ```
 
-## Limitações conhecidas e melhorias futuras
+## Known limitations and future improvements
 
-- A extração de PDF é textual; não há OCR nem tratamento especializado de tabelas ou
-  imagens. Como melhoria, o processamento poderia preservar melhor a estrutura de
-  tabelas e incluir OCR para documentos digitalizados.
-- A classificação e a geração de SQL dependem da qualidade do modelo local. A conexão
-  e a validação restringem operações SQL, mas não garantem que toda pergunta seja
-  classificada ou interpretada corretamente. Um conjunto de testes de avaliação com
-  perguntas representativas ajudaria a medir e melhorar a qualidade do roteamento,
-  das consultas e das respostas.
-- O histórico é mantido em memória e não persiste após o encerramento da sessão. Uma
-  evolução possível é oferecer persistência por usuário, com controles de privacidade
-  e opções para apagar conversas.
-- A busca e os modelos BGE podem consumir recursos consideráveis na primeira execução.
-  Otimizações ou opções de modelos menores poderiam facilitar a execução em máquinas
-  com menos memória.
+- PDF extraction is text-based; there is no OCR or specialized handling of tables or
+  images. Future work could better preserve table structure and add OCR for scanned
+  documents.
+- Classification and SQL generation depend on the quality of the local model.
+  Connection and validation restrict SQL operations, but cannot guarantee that every
+  question will be classified or interpreted correctly. An evaluation set of
+  representative questions would help measure and improve routing, queries, and
+  responses.
+- Conversation history is kept in memory and is not preserved after the session ends.
+  A possible enhancement is per-user persistence, with privacy controls and options
+  to delete conversations.
+- Retrieval and BGE models can consume significant resources on the first run.
+  Optimizations or smaller model options could make the application easier to run on
+  machines with less memory.
 
-## Uso de assistentes de código
+## Use of coding assistants
 
-Durante o desenvolvimento foi utilizado o VS Code com GitHub Copilot no plano
-gratuito, com 200 créditos disponíveis, como apoio ao trabalho no projeto. As decisões
-técnicas e a validação do comportamento da aplicação permanecem sob responsabilidade
-do autor.
+During development, I used VS Code with the free version of GitHub Copilot, which
+included 200 available credits, as an aid to the development process. The technical
+decisions and validation of the application's behavior remain my responsibility.
