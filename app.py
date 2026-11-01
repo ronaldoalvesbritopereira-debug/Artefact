@@ -64,10 +64,14 @@ if question:
     st.session_state.messages.append(
         {"role": "user", "content": question}
     )
-    result = pipeline.ask(
-        question,
-        session_id=st.session_state.conversation_id,
-    )
+    with st.chat_message("user"):
+        st.markdown(question)
+    with st.chat_message("assistant"):
+        with st.spinner("Consultando as informações..."):
+            result = pipeline.ask(
+                question,
+                session_id=st.session_state.conversation_id,
+            )
     category = (
         "Fora do escopo"
         if result.category == "OUT_OF_SCOPE"
