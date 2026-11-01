@@ -5,6 +5,11 @@ os dados operacionais para responder perguntas sobre instrumentos, pedidos e reg
 de atendimento. O sistema usa um modelo local via Ollama e apresenta uma interface
 conversacional em Streamlit.
 
+O agente identifica se deve consultar as políticas, os dados da loja ou ambos,
+mantém o contexto de perguntas de acompanhamento durante a sessão e informa as fontes
+utilizadas. Perguntas fora do escopo do atendimento recebem uma resposta apropriada,
+sem recuperar documentos nem consultar o banco de dados.
+
 ## Arquitetura
 
 1. **Dados estruturados:** os CSVs em `Desafio Técnico AI Engineer 2026/data` são
@@ -101,6 +106,10 @@ Para validar a instalação:
 pytest
 ```
 
+Os testes cobrem o roteamento, os fluxos SQL e HYBRID, a manutenção do histórico,
+a importação dos CSVs, a validação de consultas somente de leitura e os metadados dos
+documentos. A suíte foi executada neste ambiente com **26 testes aprovados**.
+
 ## Exemplos de perguntas
 
 - **RAG:** “Qual é o prazo para arrependimento de uma compra online?”
@@ -178,6 +187,10 @@ era essencial para o escopo do desafio.
 ## Exemplos de interação
 
 As imagens abaixo registram cinco cenários variados de uso do agente:
+
+**Aplicação de uma política de devolução (RAG):**
+
+![Resposta sobre a política de devolução, com indicação da origem da resposta](resultados_imagens/pergunta4.png)
 
 1. **Consulta de catálogo com filtro de preço (SQL):** [parte 1](resultados_imagens/pergunta1_parte1.png) e [parte 2](resultados_imagens/pergunta1_parte2.png).
 2. **Informação sobre o endereço da loja (RAG):** [ver imagem](resultados_imagens/pergunta2.png).
