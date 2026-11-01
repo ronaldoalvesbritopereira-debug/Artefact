@@ -77,3 +77,35 @@ def test_read_only_validator_allows_select_and_single_trailing_semicolon() -> No
     assert validate_read_only_query(" SELECT price_brl FROM products; ") == (
         "SELECT price_brl FROM products"
     )
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("SELECT 'A; B' AS value;", "SELECT 'A; B' AS value"),
+        ("SELECT 1; -- comentário do modelo", "SELECT 1"),
+        ("SELECT 1; /* comentário */", "SELECT 1"),
+        ('SELECT "name;column" FROM products;', 'SELECT "name;column" FROM products'),
+    ],
+)
+def test_read_only_validator_allows_semicolons_inside_literals_and_trailing_comments(
+    query: str,
+    expected: str,
+) -> None:
+    assert validate_read_only_query(query) == expected
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "SELECT 1; SELECT 2",
+        "SELECT 1; -- comentário\nSELECT 2",
+        "SELECT 1; /* comentário */ SELECT 2",
+        "SELECT 1;;",
+    ],
+)
+def test_read_only_validator_rejects_multiple_statements_with_comments(
+    query: str,
+) -> None:
+    with pytest.raises(ValueError, match="apenas uma instrução"):
+        validate_read_only_query(query)

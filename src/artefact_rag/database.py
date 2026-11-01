@@ -125,10 +125,57 @@ def create_read_only_sql_database(
 
 def validate_read_only_query(query: str) -> str:
     statement = query.strip()
-    if statement.endswith(";"):
-        statement = statement[:-1].rstrip()
-    if not statement or ";" in statement:
+    if not statement:
         raise ValueError("A consulta SQL deve conter apenas uma instrução.")
+
+    quote: str | None = None
+    in_line_comment = False
+    in_block_comment = False
+    has_terminator = False
+    index = 0
+    while index < len(statement):
+        character = statement[index]
+        next_character = statement[index + 1] if index + 1 < len(statement) else ""
+
+        if in_line_comment:
+            if character in "\r\n":
+                in_line_comment = False
+        elif in_block_comment:
+            if character == "*" and next_character == "/":
+                in_block_comment = False
+                index += 1
+        elif quote is not None:
+            if character == quote:
+                if next_character == quote:
+                    index += 1
+                else:
+                    quote = None
+        elif character == "-" and next_character == "-":
+            in_line_comment = True
+            index += 1
+        elif character == "/" and next_character == "*":
+            in_block_comment = True
+            index += 1
+        elif character in ("'", '"', "`"):
+            if has_terminator:
+                raise ValueError("A consulta SQL deve conter apenas uma instrução.")
+            quote = character
+        elif character == "[":
+            if has_terminator:
+                raise ValueError("A consulta SQL deve conter apenas uma instrução.")
+            quote = "]"
+        elif character == ";":
+            if has_terminator:
+                raise ValueError("A consulta SQL deve conter apenas uma instrução.")
+            has_terminator = True
+        elif has_terminator and not character.isspace():
+            raise ValueError("A consulta SQL deve conter apenas uma instrução.")
+        index += 1
+
+    if quote is not None or in_block_comment:
+        raise ValueError("A consulta SQL está incompleta.")
+    if has_terminator:
+        statement = statement[: statement.rfind(";")].rstrip()
     if not re.match(r"^(SELECT|WITH)\b", statement, flags=re.IGNORECASE):
         raise ValueError("Somente consultas SQL de leitura (SELECT ou WITH) são aceitas.")
     return statement
