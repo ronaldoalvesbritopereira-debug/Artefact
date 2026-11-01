@@ -100,6 +100,44 @@ def _decision(category: str) -> RouteDecision:
     )
 
 
+def test_pipeline_uses_ollama_default_gpu_allocation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    captured_llm_options: dict[str, Any] = {}
+
+    def create_llm(**options: Any) -> object:
+        captured_llm_options.update(options)
+        return object()
+
+    monkeypatch.setattr("artefact_rag.pipeline.initialize_database", lambda *_: [])
+    monkeypatch.setattr(
+        "artefact_rag.pipeline.create_read_only_sql_database",
+        lambda *_: object(),
+    )
+    monkeypatch.setattr(
+        "artefact_rag.pipeline.load_policy_documents",
+        lambda *_args, **_kwargs: [],
+    )
+    monkeypatch.setattr("artefact_rag.pipeline.ChatOllama", create_llm)
+    monkeypatch.setattr("artefact_rag.pipeline.create_router", lambda _: object())
+
+    SupportPipeline.from_settings(
+        Settings(
+            data_dir=tmp_path,
+            database_path=tmp_path / "test.sqlite3",
+            vector_store_dir=tmp_path / "vector_store",
+        )
+    )
+
+    assert captured_llm_options == {
+        "model": "qwen3:8b",
+        "base_url": "http://127.0.0.1:11434",
+        "temperature": 0.2,
+        "keep_alive": "5m",
+    }
+
+
 def test_sql_flow_executes_read_only_query_and_uses_conversation_history(
     tmp_path: Path,
 ) -> None:

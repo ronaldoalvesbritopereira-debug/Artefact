@@ -77,13 +77,11 @@ O serviço deve estar acessível em `http://127.0.0.1:11434`. Na primeira execu�
 os modelos BGE são carregados pelo Hugging Face; é necessária conexão à internet
 para baixar os pesos caso ainda não estejam no cache local. O arquivo
 `.env.example` lista as variáveis opcionais para ajustar o endereço do Ollama,
-os diretórios, os identificadores dos modelos e a alocação de GPU. Por padrão, os
-modelos BGE usam CPU e o Qwen usa até 20 camadas de GPU, deixando o restante na CPU.
+os diretórios e os identificadores dos modelos. O Ollama decide automaticamente
+como distribuir o Qwen entre GPU e CPU; os modelos BGE usam CPU.
 O Qwen permanece carregado durante chamadas consecutivas de classificação e resposta;
 antes da recuperação BGE, o pipeline o descarrega para reduzir o uso simultâneo de
 memória.
-`ARTEFACT_LLM_NUM_GPU` pode ser ajustado no `.env` conforme a memória disponível;
-use `0` para executar o Qwen somente na CPU.
 
 ## Execução
 

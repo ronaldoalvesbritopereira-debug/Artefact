@@ -21,7 +21,6 @@ class Settings:
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     embedding_device: str = "cpu"
     reranker_device: str = "cpu"
-    llm_num_gpu: int = 20
     ollama_base_url: str = "http://127.0.0.1:11434"
     chunk_size: int = 4096
     chunk_overlap: int = 200
@@ -56,7 +55,6 @@ class Settings:
             ),
             embedding_device=os.getenv("ARTEFACT_EMBEDDING_DEVICE", "cpu"),
             reranker_device=os.getenv("ARTEFACT_RERANKER_DEVICE", "cpu"),
-            llm_num_gpu=int(os.getenv("ARTEFACT_LLM_NUM_GPU", "20")),
             ollama_base_url=os.getenv(
                 "OLLAMA_BASE_URL", "http://127.0.0.1:11434"
             ),

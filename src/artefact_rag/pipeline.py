@@ -100,7 +100,6 @@ class SupportPipeline:
             model=settings.llm_model,
             base_url=settings.ollama_base_url,
             temperature=0.2,
-            num_gpu=settings.llm_num_gpu,
             keep_alive="5m",
         )
         router = create_router(llm)
