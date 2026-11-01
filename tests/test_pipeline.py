@@ -11,10 +11,11 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 
 from artefact_rag.pipeline import (
     ANSWER_INSTRUCTIONS,
+    ANSWER_PROMPT,
     SQL_INSTRUCTIONS,
     SupportPipeline,
 )
-from artefact_rag.routing import RouteDecision
+from artefact_rag.routing import ROUTING_INSTRUCTIONS, RouteDecision
 from artefact_rag.settings import Settings
 from artefact_rag.sql_generation import SQLStatement
 
@@ -143,18 +144,40 @@ def test_pipeline_uses_ollama_default_gpu_allocation(
 
 
 def test_answer_and_sql_prompts_include_reference_examples() -> None:
+    sql_prompt = " ".join(SQL_INSTRUCTIONS.split())
     assert "encordoamento para violão de aço e palhetas" in ANSWER_INSTRUCTIONS
     assert "Quem ganhou o jogo de futebol ontem?" in ANSWER_INSTRUCTIONS
     assert "Teclado X por R$ 1.200" in ANSWER_INSTRUCTIONS
     assert "frete grátis" in ANSWER_INSTRUCTIONS
     assert "em 1–3 dias úteis" in ANSWER_INSTRUCTIONS
     assert "em até 12x sem juros" in ANSWER_INSTRUCTIONS
+    assert "fictícios e nunca são evidência" in ANSWER_INSTRUCTIONS
+    assert "ausência de correspondência não prova estoque zero" in sql_prompt
 
-    assert "Quais são os instrumentos elétricos?" in SQL_INSTRUCTIONS
-    assert "Qual é o instrumento mais barato e o mais caro?" in SQL_INSTRUCTIONS
-    assert "Qual é o instrumento com o maior desconto?" in SQL_INSTRUCTIONS
+    assert "Quais são os instrumentos elétricos?" in sql_prompt
+    assert "Qual é o instrumento mais barato e o mais caro?" in sql_prompt
+    assert "Qual é o instrumento com o maior desconto?" in sql_prompt
+    assert "pr.is_active = 1" in sql_prompt
+    assert "Takamine GD20" not in sql_prompt
+    assert "Takamine GD20" not in ROUTING_INSTRUCTIONS
     assert "UNION ALL" in SQL_INSTRUCTIONS
     assert "discount_percent" in SQL_INSTRUCTIONS
+
+
+def test_answer_prompt_places_current_sources_after_history() -> None:
+    messages = ANSWER_PROMPT.format_messages(
+        context="produto=violão modelo X; preço=R$ 2.199,00; estoque=12",
+        history=[AIMessage(content="A resposta anterior inventou frete grátis.")],
+        question="Quanto custa esse violão?",
+    )
+
+    assert messages[-3].content == (
+        "A resposta anterior inventou frete grátis."
+    )
+    assert messages[-2].content.startswith(
+        "FONTES DESTA CONVERSA (única base factual):"
+    )
+    assert "R$ 2.199,00" in messages[-2].content
 
 
 def test_sql_flow_executes_read_only_query_and_uses_conversation_history(

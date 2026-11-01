@@ -33,7 +33,7 @@ def test_routing_prompt_includes_all_reference_examples() -> None:
         "horário de funcionamento",
         "atendimento por WhatsApp",
         "devolução de produto",
-        "Takamine GD20",
+        "preço de um violão específico",
         "violões abaixo de R$ 1.000",
         "categoria Guitarras",
         "promoções cadastradas",
