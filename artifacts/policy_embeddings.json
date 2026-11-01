@@ -1,0 +1,7 @@
+{
+  "source_name": "políticas_da_loja.pdf",
+  "source_sha256": "B7527F96896929F4BA929DE117651C6717E25B7A3B92B34BC54D5BA32F6156F7",
+  "page_count": 8,
+  "embedding_dimension": 1024,
+  "model": "BAAI/bge-m3"
+}
