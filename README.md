@@ -107,6 +107,84 @@ pytest
 - **SQL:** “Quais produtos estão cadastrados e qual é o estoque de cada um?”
 - **HYBRID:** “Posso trocar o produto do meu pedido e há unidades disponíveis?”
 
+## Decisões técnicas
+
+Antes do desenvolvimento, pesquisei abordagens recentes para arquiteturas RAG. A
+funcionalidade “Pesquisa Aprofundada” do ChatGPT foi usada como ponto de partida para
+localizar artigos científicos; depois, li os trabalhos selecionados e usei essa
+pesquisa para orientar o planejamento. A experiência anterior com RAG durante a
+pós-graduação também influenciou as decisões e ajudou a avaliar alternativas de
+recuperação.
+
+Escolhi RAG porque parte importante das perguntas do desafio depende de informações
+descritas nas políticas da loja, e não apenas de dados tabulares. Recuperar os trechos
+relacionados à pergunta permite responder com base no documento fornecido, sem enviar
+todo o PDF ao modelo a cada interação. Já preços, estoque e demais informações
+operacionais são consultados nos CSVs por SQL. Assim, cada tipo de pergunta usa a fonte
+mais apropriada; perguntas que combinam regras e dados podem seguir o fluxo HYBRID.
+
+Como o prazo de desenvolvimento era de apenas dois dias, priorizei uma arquitetura
+que pudesse ser implementada e testada nesse período, sem fine-tuning de modelos.
+Para a busca nos documentos, considerei alternativas como MPNet e ColBERT. MPNet
+costuma se beneficiar de fine-tuning para esse tipo de tarefa, o que não cabia no
+prazo; ColBERT oferece uma abordagem interessante, mas acrescentaria complexidade de
+instalação e configuração. Optei por combinar BM25 e BGE-M3: a busca lexical ajuda a
+encontrar termos e nomes específicos, enquanto a busca semântica considera o sentido
+da pergunta. A fusão dos resultados com Reciprocal Rank Fusion (RRF) reúne essas duas
+perspectivas, e o BGE-Reranker-v2-M3 reordena os candidatos para selecionar o trecho
+mais relevante.
+
+O PDF é dividido em páginas e, em seguida, em trechos menores, preservando metadados
+de origem e página. Embora o desafio forneça um único documento, essa organização
+também deixa a recuperação preparada para receber outros PDFs. Após o reranking,
+utilizo apenas um trecho (`k = 1`) como contexto final. Nos testes, fornecer vários
+trechos ao modelo local aumentava as alucinações e, por vezes, dificultava a geração
+de uma resposta adequada. Com um modelo de maior capacidade e uma janela de contexto
+maior, seria possível reavaliar essa escolha e incluir páginas vizinhas quando fossem
+necessárias para preservar o contexto.
+
+Os prompts foram ajustados iterativamente durante os testes, buscando instruções
+claras sem consumir contexto desnecessariamente. Para definir a persona e o tom da
+resposta, usei como referência o manual de políticas da loja, de modo que o
+atendimento permanecesse coerente com as informações fornecidas no desafio.
+
+O roteamento foi implementado como uma cadeia determinística, e não como um agente
+autônomo. Uma chamada estruturada classifica a pergunta como RAG, SQL ou HYBRID antes
+da execução. Essa separação deixa explícito qual fonte deve ser consultada e facilita
+inspecionar o caminho seguido pela aplicação. Perguntas fora do escopo da loja são
+tratadas sem consultar documentos ou banco de dados.
+
+Para o modelo de linguagem, escolhi o `qwen3:8b` executado localmente pelo Ollama. A
+opção evita custos com APIs durante a execução e é suficiente para o protótipo, embora
+tenha limitações de capacidade e de recursos disponíveis na máquina. O modelo é
+utilizado tanto na classificação quanto na geração das respostas. Os prompts foram
+mantidos objetivos para equilibrar as instruções de atendimento, o contexto recuperado
+e a janela disponível. A resposta também deve respeitar a persona da loja e sinalizar
+quando as fontes não contiverem os dados necessários.
+
+Para os dados tabulares, escolhi SQLite por ser simples de distribuir e não exigir um
+servidor separado. Os CSVs são carregados automaticamente, e o Pandas infere os tipos
+das colunas para favorecer consultas sobre valores numéricos, como preços e estoque.
+As consultas geradas são limitadas a uma única instrução `SELECT` ou `WITH`, e a
+conexão é aberta em modo somente leitura.
+
+Na migração para a estrutura atual, LangChain passou a fornecer integrações para
+modelos, documentos, recuperação e SQL, enquanto LangGraph organiza o fluxo e o
+histórico da conversa. O Streamlit foi escolhido para oferecer uma interface simples
+de demonstração sem tirar o foco do funcionamento do agente. O histórico é mantido em
+memória durante a sessão, evitando adicionar infraestrutura de persistência que não
+era essencial para o escopo do desafio.
+
+## Exemplos de interação
+
+As imagens abaixo registram cinco cenários variados de uso do agente:
+
+1. **Consulta de catálogo com filtro de preço (SQL):** [parte 1](resultados_imagens/pergunta1_parte1.png) e [parte 2](resultados_imagens/pergunta1_parte2.png).
+2. **Informação sobre o endereço da loja (RAG):** [ver imagem](resultados_imagens/pergunta2.png).
+3. **Consulta de preço de produto (SQL):** [ver imagem](resultados_imagens/pergunta3.png).
+4. **Aplicação da política de devolução (RAG):** [ver imagem](resultados_imagens/pergunta4.png).
+5. **Consulta de instrumentos de percussão (SQL):** [ver imagem](resultados_imagens/pergunta5.png).
+
 ## Estrutura
 
 ```text
@@ -124,12 +202,26 @@ Desafio Técnico AI Engineer 2026/data/     # PDFs e CSVs fornecidos
 tests/
 ```
 
-## Limitações conhecidas
+## Limitações conhecidas e melhorias futuras
 
 - A extração de PDF é textual; não há OCR nem tratamento especializado de tabelas ou
-  imagens.
+  imagens. Como melhoria, o processamento poderia preservar melhor a estrutura de
+  tabelas e incluir OCR para documentos digitalizados.
 - A classificação e a geração de SQL dependem da qualidade do modelo local. A conexão
   e a validação restringem operações SQL, mas não garantem que toda pergunta seja
-  classificada ou interpretada corretamente.
-- O histórico é mantido em memória e não persiste após o encerramento da sessão.
+  classificada ou interpretada corretamente. Um conjunto de testes de avaliação com
+  perguntas representativas ajudaria a medir e melhorar a qualidade do roteamento,
+  das consultas e das respostas.
+- O histórico é mantido em memória e não persiste após o encerramento da sessão. Uma
+  evolução possível é oferecer persistência por usuário, com controles de privacidade
+  e opções para apagar conversas.
 - A busca e os modelos BGE podem consumir recursos consideráveis na primeira execução.
+  Otimizações ou opções de modelos menores poderiam facilitar a execução em máquinas
+  com menos memória.
+
+## Uso de assistentes de código
+
+Durante o desenvolvimento foi utilizado o VS Code com GitHub Copilot no plano
+gratuito, com 200 créditos disponíveis, como apoio ao trabalho no projeto. As decisões
+técnicas e a validação do comportamento da aplicação permanecem sob responsabilidade
+do autor.
