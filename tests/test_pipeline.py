@@ -9,7 +9,11 @@ from langchain_core.runnables import RunnableLambda
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 
-from artefact_rag.pipeline import SupportPipeline
+from artefact_rag.pipeline import (
+    ANSWER_INSTRUCTIONS,
+    SQL_INSTRUCTIONS,
+    SupportPipeline,
+)
 from artefact_rag.routing import RouteDecision
 from artefact_rag.settings import Settings
 from artefact_rag.sql_generation import SQLStatement
@@ -136,6 +140,21 @@ def test_pipeline_uses_ollama_default_gpu_allocation(
         "temperature": 0.2,
         "keep_alive": "5m",
     }
+
+
+def test_answer_and_sql_prompts_include_reference_examples() -> None:
+    assert "encordoamento para violão de aço e palhetas" in ANSWER_INSTRUCTIONS
+    assert "Quem ganhou o jogo de futebol ontem?" in ANSWER_INSTRUCTIONS
+    assert "Teclado X por R$ 1.200" in ANSWER_INSTRUCTIONS
+    assert "frete grátis" in ANSWER_INSTRUCTIONS
+    assert "em 1–3 dias úteis" in ANSWER_INSTRUCTIONS
+    assert "em até 12x sem juros" in ANSWER_INSTRUCTIONS
+
+    assert "Quais são os instrumentos elétricos?" in SQL_INSTRUCTIONS
+    assert "Qual é o instrumento mais barato e o mais caro?" in SQL_INSTRUCTIONS
+    assert "Qual é o instrumento com o maior desconto?" in SQL_INSTRUCTIONS
+    assert "UNION ALL" in SQL_INSTRUCTIONS
+    assert "discount_percent" in SQL_INSTRUCTIONS
 
 
 def test_sql_flow_executes_read_only_query_and_uses_conversation_history(
